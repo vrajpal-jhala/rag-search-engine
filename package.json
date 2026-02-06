@@ -1,0 +1,17 @@
+{
+  "name": "rag-search-engine",
+  "module": "index.ts",
+  "type": "module",
+  "private": false,
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "bun --hot run index.ts",
+    "build": "bun build index.ts --outdir dist"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "5.9.3"
+  }
+}
