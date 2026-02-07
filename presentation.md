@@ -1,0 +1,42 @@
+- Overview
+  - Talk on Search Engines + RAG
+  - Search Engines
+    - Why? - Can't scroll, Used everywhere
+    - Why not dump into GPT? - Context Overflow + AI is expensive (time + resources)
+  - RAG
+    - Why? - Enhance + Maybe simplify + Better Understanding
+- Search Algorithms
+  - Preprocessing
+    - Exact match use cases (not semantic)
+    - Casing, punctuations
+    - Tokenizing, fuzzy, stop words (meaningless - the = the - domain specific)
+      - searching "const"
+  - Full Text Search
+    - We search the entire document for the query
+    - We return the documents that contain the query (or a subset of the query)
+    - Without ranking, we return the documents in the order they appear in the documents
+    - Random token can appear in many documents, so we need to rank them
+  - TF-IDF
+    - We create indexes to make things fast (caching)
+    - TF: Term Frequency - How many times does the term appear in the document?
+    - IDF: Inverse Document Frequency - How rare is the term in the set (excluding stop words)?
+    - Used to rank documents based on the importance of the terms in the query
+    - TF-IDF = TF * (IDF = Number of documents / Number of documents containing the term)
+    - TF-IDF is a measure of the importance of a term in all documents
+    - The higher the TF-IDF, the more important the term is and vice versa
+    - We can use TF-IDF to rank documents based on the importance of the terms in the query
+    - We would want the documents having frequent terms from the query but also rare in the set to be ranked higher
+  - BM25 TF-IDF
+    - The problems with normal IDF
+      - Very rare terms will have a very high IDF score
+      - Very common terms will have a very low IDF score
+      - log((N - Tf + 0.5) / (Tf + 0.5) + 1)
+    - The problems with normal TF
+      - Linear scaling
+      - Very common terms will have a very high TF score (irrelevant keywords)
+      - Very rare terms will have a very low TF score (It might be important, but not common)
+      - (Tf * (k1 + 1)) / (Tf + k1)
+      - Mean vs Median example
+      - Document Length Normalization
+        - We want to normalize the document length to the average length of the documents
+        - 1 - b + b * (dl / avgdl)
