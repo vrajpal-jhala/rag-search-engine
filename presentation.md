@@ -1,0 +1,23 @@
+- Overview
+  - Talk on Search Engines + RAG
+  - Search Engines
+    - Why? - Can't scroll, Used everywhere
+    - Why not dump into GPT? - Context Overflow + AI is expensive (time + resources)
+  - RAG
+    - Why? - Enhance + Maybe simplify + Better Understanding
+- Search Algorithms
+  - Preprocessing
+    - Exact match use cases (not semantic)
+    - Casing, punctuations
+    - Tokenizing, fuzzy, stop words (meaningless - the = the - domain specific)
+      - searching "const"
+  - Full Text Search
+    - We search the entire document for the query
+    - We return the documents that contain the query (or a subset of the query)
+    - Without ranking, we return the documents in the order they appear in the documents
+  - TF-IDF
+    - We create indexes to make things fast (caching)
+    - TF: Term Frequency - How many times does the term appear in the document?
+    - IDF: Inverse Document Frequency - How rare is the term in the corpus?
+    - Used to rank documents based on the importance of the terms in the query
+    - TF-IDF = TF * IDF
