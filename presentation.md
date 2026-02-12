@@ -40,3 +40,15 @@
       - Document Length Normalization
         - We want to normalize the document length to the average length of the documents
         - 1 - b + b * (dl / avgdl)
+  - Semantic Search
+    - Problems with keyword search
+      - Only exact matches are considered
+      - No search with context, synonyms, antonyms, or related words
+    - Selecting a model (based on use case, cost, performance, etc.)
+      - Multilingual models
+      - Domain specific models
+    - Dimensions
+      - Vector operations
+    - Similarity search (hot and cold game on Reddit)
+      - Dot product
+      - Cosine similarity

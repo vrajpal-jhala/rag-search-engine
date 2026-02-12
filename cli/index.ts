@@ -12,6 +12,7 @@ import {
   basicSearch,
   buildKeywordIndex,
 } from './commands/keyword_search';
+import { buildVectorIndex } from './commands/semantic_search';
 import { INDEX_TYPES, KEYWORD_SEARCH_TYPES } from './constants';
 
 const program = new Command();
@@ -68,6 +69,9 @@ program
     switch (type) {
       case INDEX_TYPES.KEYWORD:
         await buildKeywordIndex();
+        break;
+      case INDEX_TYPES.VECTOR:
+        await buildVectorIndex();
         break;
       default:
         console.error('Invalid type');
