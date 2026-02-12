@@ -17,7 +17,7 @@ export const tokenizeText = (text: string): string[] => {
     .filter(Boolean);
 };
 
-export const fuzzyMatch = (
+export const partialMatch = (
   tokens: string[],
   queryTokens: string[],
 ): boolean => {
