@@ -40,3 +40,22 @@
       - Document Length Normalization
         - We want to normalize the document length to the average length of the documents
         - 1 - b + b * (dl / avgdl)
+  - Semantic Search
+    - Problems with keyword search
+      - Only exact matches are considered
+      - No search with context, synonyms, antonyms, or related words
+    - Selecting a model (based on use case, cost, performance, etc.)
+      - Multilingual models
+      - Domain specific models
+    - Dimensions
+      - Vector operations
+    - Similarity search
+      - Dot product (dp = a1 * b1 + a2 * b2 + ... + an * bn = direction similarity and don't consider magnitude/length)
+      - Cosine similarity (cos(theta) = dp / (sqrt(a1^2 + a2^2 + ... + an^2) * sqrt(b1^2 + b2^2 + ... + bn^2)) = direction similarity and consider magnitude/length)
+      - Similarity depends on the model used
+      - Tokenization (static doesn't work as model is not trained on static tokens)
+      - Vector DBs - specialized for vector storage and retrieval
+      - Hot and cold game on Reddit
+    - LSH (Locality Sensitive Hashing)
+      - Hashing the vectors to a smaller space
+      - May miss some similar vectors

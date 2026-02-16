@@ -14,6 +14,7 @@ export const KEYWORD_SEARCH_TYPES = {
 } as const;
 export const INDEX_TYPES = {
   KEYWORD: 'keyword',
+  VECTOR: 'vector',
 } as const;
 export const BM25_K1 = 1.5;
 export const BM25_B = 0.75;

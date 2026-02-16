@@ -169,10 +169,11 @@ class InvertedIndex {
   build() {
     console.log('Building indices...');
     for (const [index, movie] of MOVIES.entries()) {
-      process.stdout.write(`${Math.round((index / MOVIES.length) * 100)}%`);
-      process.stdout.write('\r');
       this._addDocument(movie.id, `${movie.title} ${movie.description}`);
       this.docMap[movie.id] = movie;
+
+      process.stdout.write(`${Math.round((index / MOVIES.length) * 100)}%`);
+      process.stdout.write('\r');
 
       if (index === MOVIES.length - 1) {
         console.log('100%\nBuilding indices completed!');
