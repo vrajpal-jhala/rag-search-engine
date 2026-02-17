@@ -5,6 +5,10 @@ import stop_words from "../dataset/stop_words.json";
 
 export const PROJECT_ROOT = path.resolve(__dirname, "..");
 export const CACHE_PATH = path.resolve(PROJECT_ROOT, "cache");
+export const KEYWORD_CACHE_PATH = path.resolve(CACHE_PATH, "keyword");
+export const VECTOR_CACHE_PATH = path.resolve(CACHE_PATH, "vector");
+export const BASIC_VECTOR_CACHE_PATH = path.resolve(VECTOR_CACHE_PATH, "basic");
+export const CHUNKED_VECTOR_CACHE_PATH = path.resolve(VECTOR_CACHE_PATH, "chunked");
 export const MOVIES = (movies as { movies: Movie[] }).movies;
 export const STOP_WORDS = stop_words;
 export const KEYWORD_SEARCH_TYPES = {

@@ -1,7 +1,7 @@
 import type { Movie } from '../types';
 import path from 'path';
 import { partialMatch, sanitizeText, tokenizeText } from '../utils';
-import { BM25_B, BM25_K1, CACHE_PATH, MOVIES } from '../constants';
+import { BM25_B, BM25_K1, KEYWORD_CACHE_PATH, MOVIES } from '../constants';
 
 class Counter {
   map: Map<string, number>;
@@ -36,10 +36,16 @@ class Counter {
 }
 
 class InvertedIndex {
-  static indexPath = path.resolve(CACHE_PATH, 'index.json');
-  static termFrequencyPath = path.resolve(CACHE_PATH, 'term_frequency.json');
-  static documentLengthPath = path.resolve(CACHE_PATH, 'document_length.json');
-  static docMapPath = path.resolve(CACHE_PATH, 'doc_map.json');
+  static indexPath = path.resolve(KEYWORD_CACHE_PATH, 'index.json');
+  static termFrequencyPath = path.resolve(
+    KEYWORD_CACHE_PATH,
+    'term_frequency.json',
+  );
+  static documentLengthPath = path.resolve(
+    KEYWORD_CACHE_PATH,
+    'document_length.json',
+  );
+  static docMapPath = path.resolve(KEYWORD_CACHE_PATH, 'doc_map.json');
 
   docMap: Record<Movie['id'], Movie>;
   index: Record<string, Movie['id'][]>;
@@ -172,11 +178,11 @@ class InvertedIndex {
       this._addDocument(movie.id, `${movie.title} ${movie.description}`);
       this.docMap[movie.id] = movie;
 
-      process.stdout.write(`${Math.round((index / MOVIES.length) * 100)}%`);
+      process.stdout.write(`${Math.floor((index / MOVIES.length) * 100)}%`);
       process.stdout.write('\r');
 
       if (index === MOVIES.length - 1) {
-        console.log('100%\nBuilding indices completed!');
+        console.log('100%\nKeyword indices built!');
       }
     }
   }
@@ -370,7 +376,7 @@ export const bm25Search = async (query: string, topK: number = 5) => {
   const candidateDocIds = new Set<number>();
   for (const token of sanitizedQueryTokens) {
     const docIds = invertedIndex.getDocuments(token);
-    docIds.forEach(id => candidateDocIds.add(id));
+    docIds.forEach((id) => candidateDocIds.add(id));
   }
 
   // Score only candidate documents

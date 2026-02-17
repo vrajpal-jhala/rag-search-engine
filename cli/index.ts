@@ -12,7 +12,12 @@ import {
   basicSearch,
   buildKeywordIndex,
 } from './commands/keyword_search';
-import { buildVectorIndex, semanticSearch } from './commands/semantic_search';
+import {
+  buildChunkedVectorIndex,
+  buildVectorIndex,
+  chunkedSemanticSearch,
+  semanticSearch,
+} from './commands/semantic_search';
 import { INDEX_TYPES, KEYWORD_SEARCH_TYPES } from './constants';
 
 const program = new Command();
@@ -67,9 +72,11 @@ program
   .description('Search using semantic search')
   .argument('<query>', 'Search query')
   .option('-k, --topK <number>', 'Number of results', parseInt, 5)
+  .option('-c, --chunked', 'Use chunked vector index')
   .action(async (query, options) => {
-    const { topK } = options;
-    const results = await semanticSearch(query, topK);
+    const { topK, chunked } = options;
+    const search = chunked ? chunkedSemanticSearch : semanticSearch;
+    const results = await search(query, topK);
 
     results.forEach(([result, score], index) => {
       console.log(
@@ -87,15 +94,21 @@ program
       Object.values(INDEX_TYPES),
     ),
   )
+  .option('-c, --chunked', 'Build chunked vector index')
   .action(async (options) => {
-    const { type } = options;
+    const { type, chunked } = options;
 
     switch (type) {
       case INDEX_TYPES.KEYWORD:
         await buildKeywordIndex();
         break;
       case INDEX_TYPES.VECTOR:
-        await buildVectorIndex();
+        if (chunked) {
+          await buildChunkedVectorIndex();
+        } else {
+          await buildVectorIndex();
+        }
+
         break;
       default:
         console.error('Invalid type');

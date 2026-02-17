@@ -59,3 +59,16 @@
     - LSH (Locality Sensitive Hashing)
       - Hashing the vectors to a smaller space
       - May miss some similar vectors
+    - Chunking
+      - Fixed size chunking
+      - Overlapping chunks
+      - Semantic chunks
+      - Needs lots of debugging and testing to cover edge cases and get the best results
+        - Tables, multi page paragraphs, etc.
+        - Headers, footers - repeated content across chunks
+        - Image captions getting mixed up with text content
+        - Column layouts, weird spacing/fonts, missing line breaks
+        - Markdown formats
+      - ColBERT - created embeddings per token
+      - Late chunking - chunking after the embedding is created - summarization, etc. (pronouns, etc.)
+      - Try using third party services to see if there's any improvements before implementing your own
