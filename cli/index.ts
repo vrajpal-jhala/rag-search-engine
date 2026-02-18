@@ -23,6 +23,8 @@ import {
   HYBRID_SEARCH_TYPES,
   INDEX_TYPES,
   KEYWORD_SEARCH_TYPES,
+  LLM_ENHANCED_TYPES,
+  RERANK_TYPES,
 } from './constants';
 
 const program = new Command();
@@ -103,20 +105,37 @@ program
   )
   .option('-a, --alpha <number>', 'Alpha value', parseFloat, 0.5)
   .option('-k, --k <number>', 'K value for ranked hybrid search', parseInt, 60)
+  .addOption(
+    new Option('-e, --enhanced', 'Query enhancement type with LLM').choices(
+      Object.values(LLM_ENHANCED_TYPES),
+    ),
+  )
+  .addOption(
+    new Option('-r, --reRank <type>', 'Re-rank the results using LLM').choices(
+      Object.values(RERANK_TYPES),
+    ),
+  )
   .action(async (query, options) => {
-    const { limit, alpha, type, k } = options;
+    const { limit, alpha, type, k, enhanced, reRank } = options;
     const isRanked = type === HYBRID_SEARCH_TYPES.RANKED;
 
     if (isRanked) {
-      const results = await rankedHybridSearch(query, k, limit);
+      const results = await rankedHybridSearch(
+        query,
+        enhanced,
+        reRank,
+        k,
+        limit,
+      );
 
       results.forEach(
-        ([result, rank, , semanticRank, , hybridScore], index) => {
+        ([result, rank, , semanticRank, , hybridScore, crossEncoderScore], index) => {
           console.log(
-            `${index + 1}. ${result.title}
-          RRF Score: ${hybridScore}
-          BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
-          ${result.description.slice(0, 100)}...`,
+            `${index + 1}. ${result.title}${reRank === RERANK_TYPES.CROSS_ENCODER ? `
+              Cross Encoder Score: ${crossEncoderScore}` : ''}
+              RRF Score: ${hybridScore}
+              BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
+              ${result.description.slice(0, 100)}...`,
           );
         },
       );

@@ -28,3 +28,15 @@ export const BM25_K1 = 1.5;
 export const BM25_B = 0.75;
 export const HYBRID_SEARCH_ALPHA = 0.5;
 export const RECIPROCAL_RANK_FUSION_K = 60;
+export const LLM_MODEL = 'gemini-flash-latest';
+export const LLM_PROMPT_PATH = path.resolve(PROJECT_ROOT, "cli", "prompts");
+export const LLM_ENHANCED_TYPES = {
+  SPELL: 'spell',
+  REWRITE: 'rewrite',
+  EXPAND: 'expand',
+} as const;
+export const CROSS_ENCODER_MODEL = 'Xenova/ms-marco-TinyBERT-L-2-v2';
+export const RERANK_TYPES = {
+  LLM: 'llm',
+  CROSS_ENCODER: 'cross-encoder',
+} as const;

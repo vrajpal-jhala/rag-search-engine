@@ -82,3 +82,13 @@
       - Basic hybrid search can penalize one algorithm over the other - hard to normalize the scores
       - Reciprocal Rank Fusion would boost results which are good in both algorithms - only cares about ranks and not the scores
       - formula: 1 / (rank + k)
+  - LLM
+    - Query Enhancement
+      - User query can be noisy, incomplete, or misspelled
+      - Spell Correction - correct spelling errors
+      - Query rewriting - semantic meanings to keywords using model knowledge
+      - Query expansion - related terms/keywords, synonyms, antonyms, etc.
+    - Re-ranking
+      - Narrowed results from hybrid search -> re-rank results based on user query for best results
+      - LLM based - risk of hallucination
+      - Cross-encoder - more accurate than the LLM based
