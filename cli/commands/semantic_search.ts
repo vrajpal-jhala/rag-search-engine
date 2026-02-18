@@ -76,7 +76,7 @@ class VectorIndex {
     return this._dotProduct(a, b) / (this._magnitude(a) * this._magnitude(b));
   }
 
-  async search(query: string, topK: number = 5) {
+  async search(query: string, topK: number) {
     const queryEmbedding = await embed(VectorIndex.model, [query]);
     const similarities: [Movie, number][] = [];
 
@@ -105,7 +105,7 @@ class VectorIndex {
   }
 }
 
-class ChunkedVectorIndex extends VectorIndex {
+export class ChunkedVectorIndex extends VectorIndex {
   static chunkSize = 4;
   static overlap = 1;
   static override model = 'all-minilm:l6-v2';
@@ -226,7 +226,7 @@ class ChunkedVectorIndex extends VectorIndex {
     console.log('100%\nChunked vector index built!');
   }
 
-  override async search(query: string, topK: number = 5) {
+  override async search(query: string, topK: number) {
     const queryEmbedding = await embed(VectorIndex.model, [query]);
     const chunkSimilarities: [Movie['id'], number, number][] = [];
     const similarities: Record<Movie['id'], number> = {};

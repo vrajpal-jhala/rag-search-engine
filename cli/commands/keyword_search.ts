@@ -35,7 +35,7 @@ class Counter {
   }
 }
 
-class InvertedIndex {
+export class InvertedIndex {
   static indexPath = path.resolve(KEYWORD_CACHE_PATH, 'index.json');
   static termFrequencyPath = path.resolve(
     KEYWORD_CACHE_PATH,
@@ -187,6 +187,80 @@ class InvertedIndex {
     }
   }
 
+  async _search(query: string, topK: number) {
+    const results: Movie[] = [];
+    const sanitizedQueryTokens = tokenizeText(sanitizeText(query));
+
+    for (const token of sanitizedQueryTokens) {
+      const documentIds = this.getDocuments(token);
+      for (const documentId of documentIds) {
+        if (results.some((result) => result.id === documentId)) {
+          continue;
+        }
+
+        const movie = this.docMap[documentId];
+
+        results.push(movie!);
+
+        if (results.length >= topK) {
+          break;
+        }
+      }
+    }
+
+    // Without caching
+    // for (const movie of MOVIES) {
+    //   const sanitizedTitleTokens = tokenizeText(sanitizeText(movie.title));
+
+    //   if (partialMatch(sanitizedQueryTokens, sanitizedTitleTokens)) {
+    //     results.push(movie);
+
+    //     if (results.length >= topK) {
+    //       break;
+    //     }
+    //   }
+    // }
+
+    return results;
+  }
+
+  async search(query: string, topK: number) {
+    const results: [Movie, number][] = [];
+    const scores: Record<Movie['id'], number> = {};
+    const sanitizedQueryTokens = tokenizeText(sanitizeText(query));
+
+    // Only get documents that contain at least one query term
+    const candidateDocIds = new Set<number>();
+    for (const token of sanitizedQueryTokens) {
+      const docIds = this.getDocuments(token);
+      docIds.forEach((id) => candidateDocIds.add(id));
+    }
+
+    // Score only candidate documents
+    for (const docId of candidateDocIds) {
+      let score = 0;
+
+      for (const token of sanitizedQueryTokens) {
+        score += this.getBM25TfIdf(docId, token);
+      }
+
+      scores[docId] = score;
+    }
+
+    const sortedScores = Object.entries(scores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, topK);
+
+    for (const [docId, score] of sortedScores) {
+      results.push([
+        this.docMap[parseInt(docId)]!,
+        parseFloat(score.toFixed(2)),
+      ]);
+    }
+
+    return results;
+  }
+
   async save() {
     await Bun.write(
       InvertedIndex.docMapPath,
@@ -287,42 +361,9 @@ export const basicSearch = async (
   query: string,
   topK: number = 5,
 ): Promise<Movie[]> => {
-  const results: Movie[] = [];
-  const sanitizedQueryTokens = tokenizeText(sanitizeText(query));
   const invertedIndex = new InvertedIndex();
   await invertedIndex.load();
-
-  for (const token of sanitizedQueryTokens) {
-    const documentIds = invertedIndex.getDocuments(token);
-    for (const documentId of documentIds) {
-      if (results.some((result) => result.id === documentId)) {
-        continue;
-      }
-
-      const movie = invertedIndex.docMap[documentId];
-
-      results.push(movie!);
-
-      if (results.length >= topK) {
-        break;
-      }
-    }
-  }
-
-  // Without caching
-  // for (const movie of MOVIES) {
-  //   const sanitizedTitleTokens = tokenizeText(sanitizeText(movie.title));
-
-  //   if (partialMatch(sanitizedQueryTokens, sanitizedTitleTokens)) {
-  //     results.push(movie);
-
-  //     if (results.length >= topK) {
-  //       break;
-  //     }
-  //   }
-  // }
-
-  return results;
+  return invertedIndex._search(query, topK);
 };
 
 export const tfIdfSearch = async (query: string, topK: number = 5) => {
@@ -366,40 +407,7 @@ export const tfIdfSearch = async (query: string, topK: number = 5) => {
 };
 
 export const bm25Search = async (query: string, topK: number = 5) => {
-  const results: [Movie, number][] = [];
-  const scores: Record<Movie['id'], number> = {};
-  const sanitizedQueryTokens = tokenizeText(sanitizeText(query));
   const invertedIndex = new InvertedIndex();
   await invertedIndex.load();
-
-  // Only get documents that contain at least one query term
-  const candidateDocIds = new Set<number>();
-  for (const token of sanitizedQueryTokens) {
-    const docIds = invertedIndex.getDocuments(token);
-    docIds.forEach((id) => candidateDocIds.add(id));
-  }
-
-  // Score only candidate documents
-  for (const docId of candidateDocIds) {
-    let score = 0;
-
-    for (const token of sanitizedQueryTokens) {
-      score += invertedIndex.getBM25TfIdf(docId, token);
-    }
-
-    scores[docId] = score;
-  }
-
-  const sortedScores = Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, topK);
-
-  for (const [docId, score] of sortedScores) {
-    results.push([
-      invertedIndex.docMap[parseInt(docId)]!,
-      parseFloat(score.toFixed(2)),
-    ]);
-  }
-
-  return results;
+  return invertedIndex.search(query, topK);
 };

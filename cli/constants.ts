@@ -16,9 +16,15 @@ export const KEYWORD_SEARCH_TYPES = {
   TF_IDF: 'tf-idf',
   BM25: 'bm25',
 } as const;
+export const HYBRID_SEARCH_TYPES = {
+  WEIGHTED: 'weighted',
+  RANKED: 'ranked',
+} as const;
 export const INDEX_TYPES = {
   KEYWORD: 'keyword',
   VECTOR: 'vector',
 } as const;
 export const BM25_K1 = 1.5;
 export const BM25_B = 0.75;
+export const HYBRID_SEARCH_ALPHA = 0.5;
+export const RECIPROCAL_RANK_FUSION_K = 60;

@@ -18,7 +18,12 @@ import {
   chunkedSemanticSearch,
   semanticSearch,
 } from './commands/semantic_search';
-import { INDEX_TYPES, KEYWORD_SEARCH_TYPES } from './constants';
+import { hybridSearch, rankedHybridSearch } from './commands/hybrid_search';
+import {
+  HYBRID_SEARCH_TYPES,
+  INDEX_TYPES,
+  KEYWORD_SEARCH_TYPES,
+} from './constants';
 
 const program = new Command();
 
@@ -33,15 +38,15 @@ program
       Object.values(KEYWORD_SEARCH_TYPES),
     ),
   )
-  .option('-k, --topK <number>', 'Number of results', parseInt, 5)
+  .option('-l, --limit <number>', 'Number of results', parseInt, 5)
   .action(async (query, options) => {
-    const { type, topK } = options;
+    const { type, limit } = options;
 
     console.log('Searching for:', query);
 
     switch (type) {
       case KEYWORD_SEARCH_TYPES.BASIC:
-        const results = await basicSearch(query, topK);
+        const results = await basicSearch(query, limit);
 
         results.forEach((result, index) => {
           console.log(`${index + 1}. ${result.title}`);
@@ -52,7 +57,7 @@ program
       case KEYWORD_SEARCH_TYPES.BM25:
         const search =
           type === KEYWORD_SEARCH_TYPES.TF_IDF ? tfIdfSearch : bm25Search;
-        const searchResults = await search(query, topK);
+        const searchResults = await search(query, limit);
 
         searchResults.forEach(([result, score], index) => {
           console.log(
@@ -71,12 +76,12 @@ program
   .command('semantic-search')
   .description('Search using semantic search')
   .argument('<query>', 'Search query')
-  .option('-k, --topK <number>', 'Number of results', parseInt, 5)
+  .option('-l, --limit <number>', 'Number of results', parseInt, 5)
   .option('-c, --chunked', 'Use chunked vector index')
   .action(async (query, options) => {
-    const { topK, chunked } = options;
+    const { limit, chunked } = options;
     const search = chunked ? chunkedSemanticSearch : semanticSearch;
-    const results = await search(query, topK);
+    const results = await search(query, limit);
 
     results.forEach(([result, score], index) => {
       console.log(
@@ -84,6 +89,49 @@ program
         ${result.description.slice(0, 100)}...`,
       );
     });
+  });
+
+program
+  .command('hybrid-search')
+  .description('Search using hybrid search')
+  .argument('<query>', 'Search query')
+  .option('-l, --limit <number>', 'Number of results', parseInt, 5)
+  .addOption(
+    new Option('-t, --type <type>', 'Search type').choices(
+      Object.values(HYBRID_SEARCH_TYPES),
+    ),
+  )
+  .option('-a, --alpha <number>', 'Alpha value', parseFloat, 0.5)
+  .option('-k, --k <number>', 'K value for ranked hybrid search', parseInt, 60)
+  .action(async (query, options) => {
+    const { limit, alpha, type, k } = options;
+    const isRanked = type === HYBRID_SEARCH_TYPES.RANKED;
+
+    if (isRanked) {
+      const results = await rankedHybridSearch(query, k, limit);
+
+      results.forEach(
+        ([result, rank, , semanticRank, , hybridScore], index) => {
+          console.log(
+            `${index + 1}. ${result.title}
+          RRF Score: ${hybridScore}
+          BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
+          ${result.description.slice(0, 100)}...`,
+          );
+        },
+      );
+    } else {
+      const results = await hybridSearch(query, alpha, limit);
+
+      results.forEach(([result, score, semanticScore, hybridScore], index) => {
+        console.log(
+          `${index + 1}. ${result.title}
+          Hybrid Score: ${hybridScore}
+          BM25 Score: ${score}, Semantic Score: ${semanticScore}
+          ${result.description.slice(0, 100)}...`,
+        );
+      });
+    }
   });
 
 program

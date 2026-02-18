@@ -72,3 +72,13 @@
       - ColBERT - created embeddings per token
       - Late chunking - chunking after the embedding is created - summarization, etc. (pronouns, etc.)
       - Try using third party services to see if there's any improvements before implementing your own
+  - Hybrid Search
+    - Normalizing the scores from the different search algorithms
+    - Basic - Weighted combination of the scores
+      - Weighted - alpha (0.5 or 0.3 whatever works best for the use case)
+      - Combination - balanced - not really well for one but really bad for the other - outer join
+      - formula: alpha * bm25Score + (1 - alpha) * semanticScore
+    - Reciprocal Rank Fusion
+      - Basic hybrid search can penalize one algorithm over the other - hard to normalize the scores
+      - Reciprocal Rank Fusion would boost results which are good in both algorithms - only cares about ranks and not the scores
+      - formula: 1 / (rank + k)
