@@ -92,3 +92,33 @@
       - Narrowed results from hybrid search -> re-rank results based on user query for best results
       - LLM based - risk of hallucination
       - Cross-encoder - more accurate than the LLM based
+  - Evaluation
+    - Manual evaluation
+      - Difficult to automate tests due to many factors (query, docs quality, number of results), check what user wants
+        - No fixed criteria
+        - LLMs can hallucinate
+    - Golden dataset
+      - Real queries from users
+      - Quality documents - verified by domain experts
+      - Data annotation
+      - Evaluation metrics
+    - Precision metrics
+      - Like test cases
+      - Precision = relevant_retrieved / total_retrieved
+        - Of what we retrieved, how much is relevant?
+        - Of the things in your net, how many are fish?
+      - Recall = relevant_retrieved / total_relevant
+        - Of all correct relevant results, how many did we find?
+        - Of all fish in the lake, how many did you catch?
+      - F1 Score = 2 * (precision * recall) / (precision + recall)
+       - Balanced between precision and recall
+       - Penalizes imbalances
+       - Useful when precision and recall are both important
+       - Ranking is ignored
+    - Error analysis
+      - These metrics are like stack traces
+      - Instead of tweaking the parameters or retrieving more results, we can try to understand the data and the queries to improve the retrieval of results
+      - We need to debug each step of the pipeline to understand the problems
+      - Test different queries and see how the results change
+    - LLM Evaluation
+      - Engineer prompt according to the use case (by experts)

@@ -19,6 +19,7 @@ import {
   semanticSearch,
 } from './commands/semantic_search';
 import { hybridSearch, rankedHybridSearch } from './commands/hybrid_search';
+import { evaluate } from './commands/evaluation';
 import {
   HYBRID_SEARCH_TYPES,
   INDEX_TYPES,
@@ -40,7 +41,7 @@ program
       Object.values(KEYWORD_SEARCH_TYPES),
     ),
   )
-  .option('-l, --limit <number>', 'Number of results', parseInt, 5)
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
   .action(async (query, options) => {
     const { type, limit } = options;
 
@@ -78,7 +79,7 @@ program
   .command('semantic-search')
   .description('Search using semantic search')
   .argument('<query>', 'Search query')
-  .option('-l, --limit <number>', 'Number of results', parseInt, 5)
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
   .option('-c, --chunked', 'Use chunked vector index')
   .action(async (query, options) => {
     const { limit, chunked } = options;
@@ -97,14 +98,14 @@ program
   .command('hybrid-search')
   .description('Search using hybrid search')
   .argument('<query>', 'Search query')
-  .option('-l, --limit <number>', 'Number of results', parseInt, 5)
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
   .addOption(
     new Option('-t, --type <type>', 'Search type').choices(
       Object.values(HYBRID_SEARCH_TYPES),
     ),
   )
-  .option('-a, --alpha <number>', 'Alpha value', parseFloat, 0.5)
-  .option('-k, --k <number>', 'K value for ranked hybrid search', parseInt, 60)
+  .option('-a, --alpha <number>', 'Alpha value', Number, 0.5)
+  .option('-k, --k <number>', 'K value for ranked hybrid search', Number, 60)
   .addOption(
     new Option('-e, --enhanced', 'Query enhancement type with LLM').choices(
       Object.values(LLM_ENHANCED_TYPES),
@@ -115,8 +116,9 @@ program
       Object.values(RERANK_TYPES),
     ),
   )
+  .option('-j, --judge', 'Judge the results using LLM')
   .action(async (query, options) => {
-    const { limit, alpha, type, k, enhanced, reRank } = options;
+    const { limit, alpha, type, k, enhanced, reRank, judge } = options;
     const isRanked = type === HYBRID_SEARCH_TYPES.RANKED;
 
     if (isRanked) {
@@ -124,21 +126,35 @@ program
         query,
         enhanced,
         reRank,
+        judge,
         k,
         limit,
       );
 
-      results.forEach(
-        ([result, rank, , semanticRank, , hybridScore, crossEncoderScore], index) => {
-          console.log(
-            `${index + 1}. ${result.title}${reRank === RERANK_TYPES.CROSS_ENCODER ? `
-              Cross Encoder Score: ${crossEncoderScore}` : ''}
-              RRF Score: ${hybridScore}
-              BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
-              ${result.description.slice(0, 100)}...`,
-          );
-        },
-      );
+      if (judge) {
+        results.forEach(([result, score], index) => {
+          console.log(`${index + 1}. ${result.title}: ${score}/3`);
+        });
+      } else {
+        results.forEach(
+          (
+            [result, rank, , semanticRank, , hybridScore, crossEncoderScore],
+            index,
+          ) => {
+            console.log(
+              `${index + 1}. ${result.title}${
+                reRank === RERANK_TYPES.CROSS_ENCODER
+                  ? `
+                Cross Encoder Score: ${crossEncoderScore}`
+                  : ''
+              }
+                RRF Score: ${hybridScore}
+                BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
+                ${result.description.slice(0, 100)}...`,
+            );
+          },
+        );
+      }
     } else {
       const results = await hybridSearch(query, alpha, limit);
 
@@ -151,6 +167,16 @@ program
         );
       });
     }
+  });
+
+program
+  .command('evaluate')
+  .description('Evaluate the hybrid search')
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
+  .action(async (options) => {
+    const { limit } = options;
+
+    await evaluate(limit);
   });
 
 program
@@ -195,9 +221,9 @@ program
       'bm25-idf',
     ]),
   )
-  .option('-d, --docId <docId>', 'Document ID to get index for', parseInt)
-  .option('-k, --k1 <k1>', 'BM25 k1 value', parseFloat)
-  .option('-b, --b <b>', 'BM25 b value', parseFloat)
+  .option('-d, --docId <docId>', 'Document ID to get index for', Number)
+  .option('-k, --k1 <k1>', 'BM25 k1 value', Number)
+  .option('-b, --b <b>', 'BM25 b value', Number)
   .argument('<term>', 'Term to get index for')
   .action(async (term, options) => {
     const { type, docId, k1, b } = options;

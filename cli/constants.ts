@@ -1,7 +1,8 @@
-import type { Movie } from "./types";
+import type { Movie, TestCases } from "./types";
 import path from "path";
 import movies from "../dataset/movies.json";
 import stop_words from "../dataset/stop_words.json";
+import golden_dataset from "../dataset/golden_dataset.json";
 
 export const PROJECT_ROOT = path.resolve(__dirname, "..");
 export const CACHE_PATH = path.resolve(PROJECT_ROOT, "cache");
@@ -40,3 +41,4 @@ export const RERANK_TYPES = {
   LLM: 'llm',
   CROSS_ENCODER: 'cross-encoder',
 } as const;
+export const GOLDEN_DATASET = (golden_dataset as TestCases).test_cases;

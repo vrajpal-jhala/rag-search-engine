@@ -78,6 +78,28 @@ class LLM {
 
     return reRankedResults;
   }
+
+  async evaluate(
+    results: (
+      | [Movie, number, number, number, number, number]
+      | [Movie, number, number, number, number, number, number]
+    )[],
+    query: string,
+  ) {
+    const prompt = await Bun.file(
+      path.resolve(LLM_PROMPT_PATH, 'llm_judge.md'),
+    ).text();
+    const movies = results
+      .map(
+        ([result]) =>
+          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
+      )
+      .join('\n');
+    const embeddedPrompt = prompt.replace('{results}', movies);
+    const response = await this.generateContent(embeddedPrompt, query);
+
+    return response;
+  }
 }
 
 class CrossEncoder {
@@ -133,7 +155,7 @@ class CrossEncoder {
   }
 }
 
-class HybridSearch {
+export class HybridSearch {
   invertedIndex: InvertedIndex;
   vectorIndex: ChunkedVectorIndex;
 
@@ -212,9 +234,26 @@ class HybridSearch {
     return 1 / (rank + k);
   }
 
-  async search(query: string, k: number, topK: number) {
-    const results = await this.invertedIndex.search(query, topK * 500);
-    const semanticResults = await this.vectorIndex.search(query, topK * 500);
+  async search(
+    query: string,
+    enhanced:
+      | (typeof LLM_ENHANCED_TYPES)[keyof typeof LLM_ENHANCED_TYPES]
+      | undefined,
+    reRank: (typeof RERANK_TYPES)[keyof typeof RERANK_TYPES] | undefined,
+    k: number,
+    topK: number,
+  ) {
+    if (enhanced) {
+      const enhancedQuery = await new LLM().enhanced(query, enhanced);
+      console.log(
+        `Enhanced query (${enhanced}): '${query}' -> '${enhancedQuery}'`,
+      );
+      query = enhancedQuery;
+    }
+
+    // ? not sure about this - multiply by 5 to get more results to re-rank even though we already multiplied by 500
+    const results = await this.invertedIndex.search(query, (reRank ? topK * 5 : topK) * 500);
+    const semanticResults = await this.vectorIndex.search(query, (reRank ? topK * 5 : topK) * 500);
     const combinedResults: Record<
       Movie['id'],
       [Movie, number, number, number, number]
@@ -255,6 +294,18 @@ class HybridSearch {
         },
       );
 
+    if (reRank) {
+      const isLLM = reRank === RERANK_TYPES.LLM;
+      const reRanker = isLLM ? new LLM() : new CrossEncoder();
+
+      if (!isLLM) {
+        await (reRanker as CrossEncoder).load();
+      }
+
+      const reRankedResults = await reRanker.reRank(hybridResults, query);
+      return reRankedResults.slice(0, topK);
+    }
+
     return hybridResults.sort((a, b) => b[5] - a[5]).slice(0, topK);
   }
 
@@ -283,33 +334,17 @@ export const rankedHybridSearch = async (
   reRank:
     | (typeof RERANK_TYPES)[keyof typeof RERANK_TYPES]
     | undefined = undefined,
+  judge: boolean = false,
   k: number = RECIPROCAL_RANK_FUSION_K,
   topK: number = 5,
 ) => {
   const hybridSearch = new HybridSearch();
-
   await hybridSearch.load();
+  const results = await hybridSearch.search(query, enhanced, reRank, k, topK);
 
-  if (enhanced) {
-    const enhancedQuery = await new LLM().enhanced(query, enhanced);
-    console.log(
-      `Enhanced query (${enhanced}): '${query}' -> '${enhancedQuery}'`,
-    );
-    query = enhancedQuery;
-  }
-
-  const results = await hybridSearch.search(query, k, reRank ? topK * 5 : topK);
-
-  if (reRank) {
-    const isLLM = reRank === RERANK_TYPES.LLM;
-    const reRanker = isLLM ? new LLM() : new CrossEncoder();
-
-    if (!isLLM) {
-      await (reRanker as CrossEncoder).load();
-    }
-
-    const reRankedResults = await reRanker.reRank(results, query);
-    return reRankedResults.slice(0, topK);
+  if (judge) {
+    const evaluation = await new LLM().evaluate(results, query);
+    return (JSON.parse(evaluation) as number[]).map((score, index) => [results[index]![0], score]) as [Movie, number][];
   }
 
   return results;
