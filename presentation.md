@@ -4,7 +4,7 @@
     - Why? - Can't scroll, Used everywhere
     - Why not dump into GPT? - Context Overflow + AI is expensive (time + resources)
   - RAG
-    - Why? - Enhance + Maybe simplify + Better Understanding
+    - Why? - Accurate + Enhance + Maybe simplify + Better Understanding
 - Search Algorithms
   - Preprocessing
     - Exact match use cases (not semantic)

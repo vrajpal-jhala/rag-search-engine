@@ -1,159 +1,7 @@
 import type { Movie } from '../types';
-import path from 'path';
-import { GoogleGenAI } from '@google/genai';
-import {
-  AutoTokenizer,
-  AutoModelForSequenceClassification,
-} from '@huggingface/transformers';
 import { InvertedIndex } from './keyword_search';
 import { ChunkedVectorIndex } from './semantic_search';
-import {
-  CROSS_ENCODER_MODEL,
-  HYBRID_SEARCH_ALPHA,
-  LLM_ENHANCED_TYPES,
-  LLM_MODEL,
-  LLM_PROMPT_PATH,
-  RECIPROCAL_RANK_FUSION_K,
-  RERANK_TYPES,
-} from '../constants';
-
-class LLM {
-  private _client: GoogleGenAI;
-
-  constructor() {
-    this._client = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-    });
-  }
-
-  private async generateContent(prompt: string, query: string) {
-    const response = await this._client.models.generateContent({
-      model: LLM_MODEL,
-      contents: prompt,
-    });
-    return response?.text ?? '';
-  }
-
-  async enhanced(
-    query: string,
-    type: (typeof LLM_ENHANCED_TYPES)[keyof typeof LLM_ENHANCED_TYPES],
-  ) {
-    let promptFileName = '';
-
-    if (type === LLM_ENHANCED_TYPES.SPELL) {
-      promptFileName = 'spelling.md';
-    } else if (type === LLM_ENHANCED_TYPES.REWRITE) {
-      promptFileName = 'rewrite.md';
-    } else if (type === LLM_ENHANCED_TYPES.EXPAND) {
-      promptFileName = 'expand.md';
-    }
-
-    const prompt = await Bun.file(
-      path.resolve(LLM_PROMPT_PATH, promptFileName),
-    ).text();
-    const embeddedPrompt = prompt.replace('{query}', query);
-
-    return this.generateContent(embeddedPrompt, query);
-  }
-
-  async reRank(
-    results: [Movie, number, number, number, number, number][],
-    query: string,
-  ) {
-    const prompt = await Bun.file(
-      path.resolve(LLM_PROMPT_PATH, 'rerank.md'),
-    ).text();
-    const movies = results
-      .map(
-        ([result]) =>
-          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
-      )
-      .join('\n');
-    let embeddedPrompt = prompt.replace('{movies}', movies);
-    embeddedPrompt = embeddedPrompt.replace('{query}', query);
-    const response = await this.generateContent(embeddedPrompt, query);
-    const reRankedResults = (JSON.parse(response) as number[])
-      .map((id) => results.find(([result]) => result.id === id)!)
-      .filter(Boolean);
-
-    return reRankedResults;
-  }
-
-  async evaluate(
-    results: (
-      | [Movie, number, number, number, number, number]
-      | [Movie, number, number, number, number, number, number]
-    )[],
-    query: string,
-  ) {
-    const prompt = await Bun.file(
-      path.resolve(LLM_PROMPT_PATH, 'llm_judge.md'),
-    ).text();
-    const movies = results
-      .map(
-        ([result]) =>
-          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
-      )
-      .join('\n');
-    const embeddedPrompt = prompt.replace('{results}', movies);
-    const response = await this.generateContent(embeddedPrompt, query);
-
-    return response;
-  }
-}
-
-class CrossEncoder {
-  static model = CROSS_ENCODER_MODEL;
-  private _model: any = null;
-  private _tokenizer: any = null;
-
-  async load() {
-    this._tokenizer = await AutoTokenizer.from_pretrained(CrossEncoder.model);
-    this._model = await AutoModelForSequenceClassification.from_pretrained(
-      CrossEncoder.model,
-    );
-  }
-
-  async reRank(
-    results: [Movie, number, number, number, number, number][],
-    query: string,
-  ) {
-    if (!this._model || !this._tokenizer) {
-      throw new Error('Cross encoder not loaded');
-    }
-
-    const reRankedResults: [
-      Movie,
-      number,
-      number,
-      number,
-      number,
-      number,
-      number,
-    ][] = [];
-
-    for (const result of results) {
-      const text = `${result[0].title} - ${result[0].description}`;
-
-      // Tokenize query and text as a pair
-      const inputs = await this._tokenizer(query, {
-        text_pair: text,
-        padding: true,
-        truncation: true,
-      });
-
-      const output = await this._model(inputs);
-
-      // Use raw logit as the relevance score (can be positive or negative)
-      // Higher scores = more relevant
-      const score = output.logits.data[0];
-
-      reRankedResults.push([...result, score]);
-    }
-
-    return reRankedResults.sort((a, b) => b[6] - a[6]).slice(0, results.length);
-  }
-}
+import { HYBRID_SEARCH_ALPHA, RECIPROCAL_RANK_FUSION_K } from '../constants';
 
 export class HybridSearch {
   invertedIndex: InvertedIndex;
@@ -234,26 +82,9 @@ export class HybridSearch {
     return 1 / (rank + k);
   }
 
-  async search(
-    query: string,
-    enhanced:
-      | (typeof LLM_ENHANCED_TYPES)[keyof typeof LLM_ENHANCED_TYPES]
-      | undefined,
-    reRank: (typeof RERANK_TYPES)[keyof typeof RERANK_TYPES] | undefined,
-    k: number,
-    topK: number,
-  ) {
-    if (enhanced) {
-      const enhancedQuery = await new LLM().enhanced(query, enhanced);
-      console.log(
-        `Enhanced query (${enhanced}): '${query}' -> '${enhancedQuery}'`,
-      );
-      query = enhancedQuery;
-    }
-
-    // ? not sure about this - multiply by 5 to get more results to re-rank even though we already multiplied by 500
-    const results = await this.invertedIndex.search(query, (reRank ? topK * 5 : topK) * 500);
-    const semanticResults = await this.vectorIndex.search(query, (reRank ? topK * 5 : topK) * 500);
+  async search(query: string, k: number, topK: number) {
+    const results = await this.invertedIndex.search(query, topK * 500);
+    const semanticResults = await this.vectorIndex.search(query, topK * 500);
     const combinedResults: Record<
       Movie['id'],
       [Movie, number, number, number, number]
@@ -294,18 +125,6 @@ export class HybridSearch {
         },
       );
 
-    if (reRank) {
-      const isLLM = reRank === RERANK_TYPES.LLM;
-      const reRanker = isLLM ? new LLM() : new CrossEncoder();
-
-      if (!isLLM) {
-        await (reRanker as CrossEncoder).load();
-      }
-
-      const reRankedResults = await reRanker.reRank(hybridResults, query);
-      return reRankedResults.slice(0, topK);
-    }
-
     return hybridResults.sort((a, b) => b[5] - a[5]).slice(0, topK);
   }
 
@@ -328,24 +147,11 @@ export const hybridSearch = async (
 
 export const rankedHybridSearch = async (
   query: string,
-  enhanced:
-    | (typeof LLM_ENHANCED_TYPES)[keyof typeof LLM_ENHANCED_TYPES]
-    | undefined = undefined,
-  reRank:
-    | (typeof RERANK_TYPES)[keyof typeof RERANK_TYPES]
-    | undefined = undefined,
-  judge: boolean = false,
   k: number = RECIPROCAL_RANK_FUSION_K,
   topK: number = 5,
 ) => {
   const hybridSearch = new HybridSearch();
   await hybridSearch.load();
-  const results = await hybridSearch.search(query, enhanced, reRank, k, topK);
-
-  if (judge) {
-    const evaluation = await new LLM().evaluate(results, query);
-    return (JSON.parse(evaluation) as number[]).map((score, index) => [results[index]![0], score]) as [Movie, number][];
-  }
-
+  const results = await hybridSearch.search(query, k, topK);
   return results;
 };

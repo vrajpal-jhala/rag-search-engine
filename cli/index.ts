@@ -19,6 +19,7 @@ import {
   semanticSearch,
 } from './commands/semantic_search';
 import { hybridSearch, rankedHybridSearch } from './commands/hybrid_search';
+import { llmAidedHybridSearch } from './commands/llm_search';
 import { evaluate } from './commands/evaluation';
 import {
   HYBRID_SEARCH_TYPES,
@@ -106,55 +107,26 @@ program
   )
   .option('-a, --alpha <number>', 'Alpha value', Number, 0.5)
   .option('-k, --k <number>', 'K value for ranked hybrid search', Number, 60)
-  .addOption(
-    new Option('-e, --enhanced', 'Query enhancement type with LLM').choices(
-      Object.values(LLM_ENHANCED_TYPES),
-    ),
-  )
-  .addOption(
-    new Option('-r, --reRank <type>', 'Re-rank the results using LLM').choices(
-      Object.values(RERANK_TYPES),
-    ),
-  )
-  .option('-j, --judge', 'Judge the results using LLM')
   .action(async (query, options) => {
-    const { limit, alpha, type, k, enhanced, reRank, judge } = options;
+    const { limit, alpha, type, k } = options;
     const isRanked = type === HYBRID_SEARCH_TYPES.RANKED;
 
     if (isRanked) {
-      const results = await rankedHybridSearch(
-        query,
-        enhanced,
-        reRank,
-        judge,
-        k,
-        limit,
-      );
+      const results = await rankedHybridSearch(query, k, limit);
 
-      if (judge) {
-        results.forEach(([result, score], index) => {
-          console.log(`${index + 1}. ${result.title}: ${score}/3`);
-        });
-      } else {
-        results.forEach(
-          (
-            [result, rank, , semanticRank, , hybridScore, crossEncoderScore],
-            index,
-          ) => {
-            console.log(
-              `${index + 1}. ${result.title}${
-                reRank === RERANK_TYPES.CROSS_ENCODER
-                  ? `
-                Cross Encoder Score: ${crossEncoderScore}`
-                  : ''
-              }
-                RRF Score: ${hybridScore}
-                BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
-                ${result.description.slice(0, 100)}...`,
-            );
-          },
-        );
-      }
+      results.forEach(
+        (
+          [result, rank, _score, semanticRank, _semanticScore, hybridScore],
+          index,
+        ) => {
+          console.log(
+            `${index + 1}. ${result.title}
+              RRF Score: ${hybridScore}
+              BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
+              ${result.description.slice(0, 100)}...`,
+          );
+        },
+      );
     } else {
       const results = await hybridSearch(query, alpha, limit);
 
@@ -166,6 +138,61 @@ program
           ${result.description.slice(0, 100)}...`,
         );
       });
+    }
+  });
+
+program
+  .command('llm-search')
+  .description('LLM aided hybrid search')
+  .argument('<query>', 'Search query')
+  .option('-k, --k <number>', 'K value for ranked hybrid search', Number, 60)
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
+  .addOption(
+    new Option(
+      '-e, --enhanced <type>',
+      'Query enhancement type with LLM',
+    ).choices(Object.values(LLM_ENHANCED_TYPES)),
+  )
+  .addOption(
+    new Option('-r, --reRank <type>', 'Re-rank the results using LLM').choices(
+      Object.values(RERANK_TYPES),
+    ),
+  )
+  .option('-j, --judge', 'Judge the results using LLM')
+  .action(async (query, options) => {
+    const { k, limit, enhanced, reRank, judge } = options;
+    const results = await llmAidedHybridSearch(
+      query,
+      enhanced,
+      reRank,
+      judge,
+      k,
+      limit,
+    );
+
+    if (judge) {
+      results.forEach(([result, score], index) => {
+        console.log(`${index + 1}. ${result.title}: ${score}/3`);
+      });
+    } else {
+      results.forEach(
+        (
+          [result, rank, , semanticRank, , hybridScore, crossEncoderScore],
+          index,
+        ) => {
+          console.log(
+            `${index + 1}. ${result.title}${
+              reRank === RERANK_TYPES.CROSS_ENCODER
+                ? `
+            Cross Encoder Score: ${crossEncoderScore}`
+                : ''
+            }
+          RRF Score: ${hybridScore}
+          BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
+          ${result.description.slice(0, 100)}...`,
+          );
+        },
+      );
     }
   });
 
