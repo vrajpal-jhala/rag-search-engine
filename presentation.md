@@ -126,3 +126,11 @@
     - Q&A
     - Summary
     - Citation
+  - Agentic RAG
+    - Recursive retrieval
+    - LLM controlled
+    - Tool calls in a loop
+    - Slower and expensive
+  - Multi-modal RAG
+    - Text, images, videos, audio, etc.
+    - With multi-modal LLM

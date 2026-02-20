@@ -207,10 +207,11 @@ program
       Object.values(RAG_TYPES),
     ),
   )
+  .option('-i, --image <image>', 'Image path')
   .option('-l, --limit <number>', 'Number of results', Number, 5)
   .action(async (query, options) => {
-    const { limit, type } = options;
-    const [results, answer] = await rag(query, type, limit);
+    const { type, image, limit } = options;
+    const [results, answer] = await rag(query, type, image, limit);
 
     console.log('Search Results:')
     results.forEach((result) => {

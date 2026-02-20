@@ -4,7 +4,12 @@ import {
   AutoTokenizer,
   AutoModelForSequenceClassification,
 } from '@huggingface/transformers';
-import { GoogleGenAI } from '@google/genai';
+import {
+  GoogleGenAI,
+  createPartFromBase64,
+  createPartFromText,
+  type ContentListUnion,
+} from '@google/genai';
 import {
   LLM_MODEL,
   LLM_ENHANCED_TYPES,
@@ -78,7 +83,7 @@ export class LLM {
     });
   }
 
-  private async generateContent(prompt: string) {
+  private async generateContent(prompt: ContentListUnion) {
     const response = await this._client.models.generateContent({
       model: LLM_MODEL,
       contents: prompt,
@@ -196,6 +201,20 @@ export class LLM {
       .replace('{docs}', movies)
       .replace('{query}', query);
     return this.generateContent(embeddedPrompt);
+  }
+
+  async generateImageDescription(query: string, image: string) {
+    const prompt = await Bun.file(
+      path.resolve(LLM_PROMPT_PATH, 'image_description.md'),
+    ).text();
+    const imageFile = Bun.file(path.resolve(image));
+    const imageBase64 = Buffer.from(await imageFile.arrayBuffer()).toString(
+      'base64',
+    );
+    const imagePart = createPartFromBase64(imageBase64, imageFile.type);
+    return this.generateContent({
+      parts: [createPartFromText(prompt), imagePart, createPartFromText(query)],
+    });
   }
 
   async search(
