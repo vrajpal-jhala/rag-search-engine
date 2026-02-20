@@ -20,12 +20,14 @@ import {
 } from './commands/semantic_search';
 import { hybridSearch, rankedHybridSearch } from './commands/hybrid_search';
 import { llmAidedHybridSearch } from './commands/llm_search';
+import { rag } from './commands/rag';
 import { evaluate } from './commands/evaluation';
 import {
   HYBRID_SEARCH_TYPES,
   INDEX_TYPES,
   KEYWORD_SEARCH_TYPES,
   LLM_ENHANCED_TYPES,
+  RAG_TYPES,
   RERANK_TYPES,
 } from './constants';
 
@@ -194,6 +196,27 @@ program
         },
       );
     }
+  });
+
+program
+  .command('rag')
+  .description('RAG search')
+  .argument('<query>', 'Search query')
+  .addOption(
+    new Option('-t, --type <type>', 'RAG type').choices(
+      Object.values(RAG_TYPES),
+    ),
+  )
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
+  .action(async (query, options) => {
+    const { limit, type } = options;
+    const [results, answer] = await rag(query, type, limit);
+
+    console.log('Search Results:')
+    results.forEach((result) => {
+      console.log(`- ${result.title}`);
+    });
+    console.log(`Answer: ${answer}`);
   });
 
 program

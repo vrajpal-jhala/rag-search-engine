@@ -42,3 +42,9 @@ export const RERANK_TYPES = {
   CROSS_ENCODER: 'cross-encoder',
 } as const;
 export const GOLDEN_DATASET = (golden_dataset as TestCases).test_cases;
+export const RAG_TYPES = {
+  ANSWER: 'answer',
+  SUMMARY: 'summary',
+  CITATION: 'citation',
+  DETAILED_ANSWER: 'detailed_answer',
+} as const;

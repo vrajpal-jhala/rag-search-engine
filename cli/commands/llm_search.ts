@@ -12,6 +12,7 @@ import {
   RERANK_TYPES,
   CROSS_ENCODER_MODEL,
   RECIPROCAL_RANK_FUSION_K,
+  RAG_TYPES,
 } from '../constants';
 import { rankedHybridSearch } from './hybrid_search';
 
@@ -153,6 +154,48 @@ export class LLM {
     const response = await this.generateContent(embeddedPrompt);
 
     return response;
+  }
+
+  async augmentedGeneration(
+    results: (
+      | [Movie, number, number, number, number, number]
+      | [Movie, number, number, number, number, number, number]
+    )[],
+    query: string,
+    type: (typeof RAG_TYPES)[keyof typeof RAG_TYPES],
+  ) {
+    let promptFileName = '';
+
+    switch (type) {
+      case RAG_TYPES.CITATION:
+        promptFileName = 'answer_with_citations.md';
+        break;
+      case RAG_TYPES.SUMMARY:
+        promptFileName = 'summarization.md';
+        break;
+      case RAG_TYPES.DETAILED_ANSWER:
+        promptFileName = 'answer_question_detailed.md';
+        break;
+      case RAG_TYPES.ANSWER:
+        promptFileName = 'answer_question.md';
+        break;
+      default:
+        throw new Error(`Unsupported RAG type: ${type}`);
+    }
+
+    const prompt = await Bun.file(
+      path.resolve(LLM_PROMPT_PATH, promptFileName),
+    ).text();
+    const movies = results
+      .map(
+        ([result]) =>
+          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
+      )
+      .join('\n');
+    const embeddedPrompt = prompt
+      .replace('{docs}', movies)
+      .replace('{query}', query);
+    return this.generateContent(embeddedPrompt);
   }
 
   async search(

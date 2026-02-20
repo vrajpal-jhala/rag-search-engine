@@ -122,3 +122,7 @@
       - Test different queries and see how the results change
     - LLM Evaluation
       - Engineer prompt according to the use case (by experts)
+  - Augmented Generation
+    - Q&A
+    - Summary
+    - Citation
