@@ -1,140 +1,668 @@
-- Overview
-  - Talk on Search Engines + RAG
-  - Search Engines
-    - Why? - Can't scroll, Used everywhere
-    - Why not dump into GPT? - Context Overflow + AI is expensive (time + resources)
-  - RAG
-    - Why? - Accurate + Enhance + Maybe simplify + Better Understanding
-- Search Algorithms
-  - Preprocessing
-    - Exact match use cases (not semantic)
-    - Casing, punctuations
-    - Tokenizing, fuzzy, stop words (meaningless - the = the - domain specific)
-      - searching "const"
-  - Full Text Search
-    - We search the entire document for the query
-    - We return the documents that contain the query (or a subset of the query)
-    - Without ranking, we return the documents in the order they appear in the documents
-    - Random token can appear in many documents, so we need to rank them
-  - TF-IDF
-    - We create indexes to make things fast (caching)
-    - TF: Term Frequency - How many times does the term appear in the document?
-    - IDF: Inverse Document Frequency - How rare is the term in the set (excluding stop words)?
-    - Used to rank documents based on the importance of the terms in the query
-    - TF-IDF = TF * (IDF = Number of documents / Number of documents containing the term)
-    - TF-IDF is a measure of the importance of a term in all documents
-    - The higher the TF-IDF, the more important the term is and vice versa
-    - We can use TF-IDF to rank documents based on the importance of the terms in the query
-    - We would want the documents having frequent terms from the query but also rare in the set to be ranked higher
-  - BM25 TF-IDF
-    - The problems with normal IDF
-      - Very rare terms will have a very high IDF score
-      - Very common terms will have a very low IDF score
-      - log((N - Tf + 0.5) / (Tf + 0.5) + 1)
-    - The problems with normal TF
-      - Linear scaling
-      - Very common terms will have a very high TF score (irrelevant keywords)
-      - Very rare terms will have a very low TF score (It might be important, but not common)
-      - (Tf * (k1 + 1)) / (Tf + k1)
-      - Mean vs Median example
-      - Document Length Normalization
-        - We want to normalize the document length to the average length of the documents
-        - 1 - b + b * (dl / avgdl)
-  - Semantic Search
-    - Problems with keyword search
-      - Only exact matches are considered
-      - No search with context, synonyms, antonyms, or related words
-    - Selecting a model (based on use case, cost, performance, etc.)
-      - Multilingual models
-      - Domain specific models
-    - Dimensions
-      - Vector operations
-    - Similarity search
-      - Dot product (dp = a1 * b1 + a2 * b2 + ... + an * bn = direction similarity and don't consider magnitude/length)
-      - Cosine similarity (cos(theta) = dp / (sqrt(a1^2 + a2^2 + ... + an^2) * sqrt(b1^2 + b2^2 + ... + bn^2)) = direction similarity and consider magnitude/length)
-      - Similarity depends on the model used
-      - Tokenization (static doesn't work as model is not trained on static tokens)
-      - Vector DBs - specialized for vector storage and retrieval
-      - Hot and cold game on Reddit
-    - LSH (Locality Sensitive Hashing)
-      - Hashing the vectors to a smaller space
-      - May miss some similar vectors
-    - Chunking
-      - Fixed size chunking
-      - Overlapping chunks
-      - Semantic chunks
-      - Needs lots of debugging and testing to cover edge cases and get the best results
-        - Tables, multi page paragraphs, etc.
-        - Headers, footers - repeated content across chunks
-        - Image captions getting mixed up with text content
-        - Column layouts, weird spacing/fonts, missing line breaks
-        - Markdown formats
-      - ColBERT - created embeddings per token
-      - Late chunking - chunking after the embedding is created - summarization, etc. (pronouns, etc.)
-      - Try using third party services to see if there's any improvements before implementing your own
-  - Hybrid Search
-    - Normalizing the scores from the different search algorithms
-    - Basic - Weighted combination of the scores
-      - Weighted - alpha (0.5 or 0.3 whatever works best for the use case)
-      - Combination - balanced - not really well for one but really bad for the other - outer join
-      - formula: alpha * bm25Score + (1 - alpha) * semanticScore
-    - Reciprocal Rank Fusion
-      - Basic hybrid search can penalize one algorithm over the other - hard to normalize the scores
-      - Reciprocal Rank Fusion would boost results which are good in both algorithms - only cares about ranks and not the scores
-      - formula: 1 / (rank + k)
-  - LLM
-    - Query Enhancement
-      - User query can be noisy, incomplete, or misspelled
-      - Spell Correction - correct spelling errors
-      - Query rewriting - semantic meanings to keywords using model knowledge
-      - Query expansion - related terms/keywords, synonyms, antonyms, etc.
-    - Re-ranking
-      - Narrowed results from hybrid search -> re-rank results based on user query for best results
-      - LLM based - risk of hallucination
-      - Cross-encoder - more accurate than the LLM based
-  - Evaluation
-    - Manual evaluation
-      - Difficult to automate tests due to many factors (query, docs quality, number of results), check what user wants
-        - No fixed criteria
-        - LLMs can hallucinate
-    - Golden dataset
-      - Real queries from users
-      - Quality documents - verified by domain experts
-      - Data annotation
-      - Evaluation metrics
-    - Precision metrics
-      - Like test cases
-      - Precision = relevant_retrieved / total_retrieved
-        - Of what we retrieved, how much is relevant?
-        - Of the things in your net, how many are fish?
-      - Recall = relevant_retrieved / total_relevant
-        - Of all correct relevant results, how many did we find?
-        - Of all fish in the lake, how many did you catch?
-      - F1 Score = 2 * (precision * recall) / (precision + recall)
-       - Balanced between precision and recall
-       - Penalizes imbalances
-       - Useful when precision and recall are both important
-       - Ranking is ignored
-    - Error analysis
-      - These metrics are like stack traces
-      - Instead of tweaking the parameters or retrieving more results, we can try to understand the data and the queries to improve the retrieval of results
-      - We need to debug each step of the pipeline to understand the problems
-      - Test different queries and see how the results change
-    - LLM Evaluation
-      - Engineer prompt according to the use case (by experts)
-  - Augmented Generation
-    - Q&A
-    - Summary
-    - Citation
-  - Agentic RAG
-    - Recursive retrieval
-    - LLM controlled
-    - Tool calls in a loop
-    - Slower and expensive
-  - Multi-modal RAG
-    - Text, images, videos, audio, etc.
-    - With multi-modal LLM
-    - Comparable
-      - Convert image to text using LLM to make them comparable
-      - Use image alt text (to minimize the distance between the image and the text embeddings)
-      - Text surrounded by image
+---
+marp: true
+theme: default
+paginate: true
+title: From Search to RAG
+description: How Modern Retrieval Systems Power Reliable AI
+---
+
+# From Search to RAG
+## How Modern Retrieval Systems Power Reliable AI
+
+---
+
+# A Real Problem
+
+A user asks:
+
+> "Why is our CI build failing intermittently?"
+
+We have:
+
+```
+        Slack Threads
+              \
+ Docs ---- User Query ---- PR Comments
+              /
+           Runbooks
+```
+
+Information exists.  
+Finding the right piece is the challenge.
+
+---
+
+# Why Not Just Use GPT?
+
+Why not do this?
+
+```
+        ALL COMPANY DATA
+                ↓
+               GPT
+                ↓
+             Answer
+```
+
+Problems:
+
+- ❌ Context window limits  
+- ❌ Expensive (tokens + latency)  
+- ❌ Hallucination risk  
+- ❌ No ranking logic  
+
+LLMs don’t replace retrieval.
+
+---
+
+# The Real Solution
+
+Instead:
+
+```
+User → Retrieval → GPT → Answer
+```
+
+Filter first.  
+Generate second.
+
+To understand RAG…  
+We must understand search.
+
+---
+
+# Part 1 — The Evolution of Retrieval
+
+Search evolved over decades.
+
+---
+
+# Stage 1 — Naive Text Matching
+
+Early search:
+
+- Match exact words  
+- Return documents containing them  
+
+No ranking.  
+No notion of relevance.
+
+---
+
+# The Ranking Problem
+
+Query: "build error"
+
+```
+Doc A – mentions once
+Doc B – mentions 15 times
+Doc C – mentions in title
+Doc D – huge irrelevant log
+```
+
+Which comes first?
+
+We need scoring.
+
+---
+
+# TF-IDF (Intuition)
+
+Two ideas:
+
+**Term Frequency (TF)**  
+How often in this document?
+
+**Inverse Document Frequency (IDF)**  
+How rare across all documents?
+
+Example:
+
+```
+Word: "the"
+Appears in 99% documents
+→ Low importance
+
+Word: "segmentation fault"
+Appears in 2% documents
+→ High importance
+```
+
+Important words are:
+Frequent in doc + Rare overall.
+
+---
+
+# Why TF-IDF Wasn’t Enough
+
+Problems:
+
+- Rare words get extreme scores  
+- Common words become useless  
+- Long documents dominate  
+- Frequency grows linearly  
+
+Search needed refinement.
+
+---
+
+# BM25
+
+Improved ranking function.
+
+Fixes:
+
+- Caps term frequency growth  
+- Normalizes document length  
+- Smooths rare/common imbalance  
+
+Still keyword-based.  
+Still no semantic understanding.
+
+---
+
+# Keyword Search Limitation
+
+Keyword search matches:
+
+"car"
+
+But not:
+
+"automobile"
+
+No understanding of meaning.
+
+Time for semantic search.
+
+---
+
+# Stage 2 — Semantic Search
+
+New idea:
+
+Text → Vector  
+Similarity → Mathematical distance
+
+Similar meaning = closer vectors.
+
+---
+
+# Embeddings
+
+```
+Text → Embedding Model → Vector
+```
+
+Vector space intuition:
+
+```
+         automobile
+             •
+            •
+ car   •
+                    
+                    banana
+                      •
+```
+
+Car & automobile are close.  
+Banana is far.
+
+Meaning becomes geometry.
+
+---
+
+# Similarity Search
+
+How do we compare vectors?
+
+```
+Vector A  →
+Vector B  →  (small angle = similar)
+Vector C  ↑  (large angle = different)
+```
+
+Common metrics:
+
+- Dot Product  
+- Cosine Similarity  
+
+We compare direction, not just words.
+
+---
+
+# Why We Need Vector Databases
+
+Vectors are high dimensional.
+
+Brute-force comparison is expensive.
+
+```
+User Query
+     ↓
+  Embed
+     ↓
+  Vector DB
+     ↓
+  Top K Nearest Neighbors
+```
+
+Vector DBs use approximate search for speed.
+
+---
+
+# Chunking — Where Systems Break
+
+We don’t embed entire documents.
+
+We split them.
+
+Example document:
+
+```
+[ Header ]
+Paragraph 1
+Paragraph 2
+Table
+Paragraph 3
+[ Footer ]
+```
+
+Naive chunking:
+
+```
+Chunk 1: Header + P1
+Chunk 2: P2 + Table (cut)
+Chunk 3: Table + P3
+Chunk 4: Footer
+```
+
+Problems:
+
+- Tables split  
+- Headers repeated  
+- Context lost  
+
+Chunking quality determines retrieval quality.
+
+---
+
+# Chunking Strategies
+
+1. Fixed-size chunks  
+2. Overlapping chunks  
+3. Semantic chunks  
+
+Tradeoffs:
+
+Too small → lose context  
+Too large → dilute relevance  
+
+Requires experimentation.
+
+---
+
+# Beyond Basic Embeddings — ColBERT
+
+Standard (Bi-Encoder):
+
+```
+[Chunk] → One Vector
+```
+
+ColBERT (Late Interaction):
+
+```
+Token1 → Vector
+Token2 → Vector
+Token3 → Vector
+```
+
+At scoring time:
+Tokens interact for finer matching.
+
+Tradeoff:
+
+✔ Higher precision  
+✖ More compute  
+
+---
+
+# Stage 3 — Hybrid Search
+
+Keyword search:
+✔ Exact matches  
+✖ No meaning  
+
+Semantic search:
+✔ Contextual  
+✖ May miss exact keywords  
+
+Best practice: Combine both.
+
+---
+
+# Hybrid Fusion
+
+Two ranked lists:
+
+```
+Keyword Search → Rank List A
+Semantic Search → Rank List B
+
+              ↓
+        Fusion Layer
+              ↓
+        Final Ranking
+```
+
+Methods:
+
+- Weighted score combination  
+- Reciprocal Rank Fusion (rank-based)  
+
+Hybrid is practical and robust.
+
+---
+
+# Key Insight
+
+Modern retrieval systems are:
+
+Keyword  
++ Semantic  
++ Good chunking  
++ Smart ranking  
+
+Retrieval quality determines everything that follows.
+
+---
+
+# Part 2 — Measuring Retrieval
+
+Before adding LLMs…
+
+How do we know it works?
+
+---
+
+# Precision
+
+Of what we retrieved:
+
+How much is relevant?
+
+Fishing analogy:
+
+```
+Lake = All Relevant Documents
+Net  = Retrieved Documents
+
+Fish inside net = Relevant retrieved
+```
+
+Precision = Fish in net / Net size
+
+---
+
+# Recall
+
+Of all fish in the lake:
+
+How many did we catch?
+
+Recall = Fish caught / Total fish in lake
+
+Tradeoff exists between precision and recall.
+
+---
+
+# F1 Score
+
+Balances both.
+
+Useful when:
+
+- Missing answers is bad  
+- Wrong answers is also bad  
+
+But it ignores ranking order.
+
+---
+
+# Golden Dataset
+
+You need:
+
+- Real user queries  
+- Verified relevant documents  
+- Human annotation  
+
+Without this, improvements are guesswork.
+
+---
+
+# Error Analysis
+
+Metrics are like stack traces.
+
+When retrieval fails:
+
+- Inspect queries  
+- Inspect chunks  
+- Inspect embeddings  
+- Inspect ranking  
+
+Retrieval is a pipeline problem.
+
+---
+
+# Part 3 — Building RAG
+
+Now we add generation.
+
+---
+
+# What is RAG?
+
+Retrieval Augmented Generation.
+
+```
+User Query
+     ↓
+Query Enhancement
+     ↓
+Hybrid Retrieval
+     ↓
+Re-ranking
+     ↓
+Context Builder
+     ↓
+LLM
+     ↓
+Answer
+```
+
+RAG = Retrieval + Generation.
+
+---
+
+# Why RAG Works
+
+LLM alone:
+
+- Hallucinates  
+- Lacks private data  
+
+With retrieval:
+
+- Grounded  
+- Context-aware  
+- Reliable  
+
+---
+
+# Query Enhancement
+
+Users write messy queries.
+
+LLMs can:
+
+- Correct spelling  
+- Rewrite queries  
+- Expand context  
+- Clarify intent  
+
+Better query → better retrieval.
+
+---
+
+# Re-Ranking
+
+After retrieval (Top 50):
+
+```
+Top 50 → Re-ranker → Top 5
+```
+
+Options:
+
+- Cross-encoder  
+- LLM-based reranker  
+
+Improves final context.
+
+---
+
+# Retrieval vs Generation
+
+```
+Retrieval:
+Find relevant information
+
+Generation:
+Explain clearly
+```
+
+Keep responsibilities separate.
+
+---
+
+# Context Construction
+
+Before sending to LLM:
+
+- Select top chunks  
+- Remove duplicates  
+- Order logically  
+- Respect token limits  
+
+Garbage context → Garbage output.
+
+---
+
+# Augmented Generation
+
+RAG enables:
+
+- Q&A  
+- Summaries  
+- Citation-based answers  
+- Internal knowledge assistants  
+
+Grounded AI systems.
+
+---
+
+# Part 4 — Advanced RAG
+
+Only after fundamentals are strong.
+
+---
+
+# Agentic RAG
+
+LLM controls retrieval loop.
+
+```
+LLM
+  ↓
+Retrieve
+  ↓
+More Context
+  ↓
+LLM
+  ↓
+Answer
+```
+
+Powerful but:
+
+- Slower  
+- Expensive  
+- Harder to debug  
+
+---
+
+# Multi-Modal RAG
+
+Beyond text:
+
+```
+[Image]
+    ↘
+     Embedding Space
+    ↗
+[Text]
+```
+
+Approaches:
+
+- Convert image to text  
+- Multimodal embeddings  
+- Align image & text representations  
+
+---
+
+# Big Picture
+
+Reliable AI systems require:
+
+- Strong retrieval  
+- Good ranking  
+- Proper evaluation  
+- Careful orchestration  
+
+Not just embeddings + GPT.
+
+---
+
+# Final Takeaways
+
+1. Search evolved over decades  
+2. Keyword search still matters  
+3. Semantic search adds meaning  
+4. Hybrid is practical  
+5. Retrieval quality determines RAG quality  
+6. Evaluation is essential  
+
+---
+
+# Closing Thought
+
+RAG is not magic.
+
+It is:
+
+Information Retrieval  
++ Ranking  
++ Engineering Discipline  
++ LLM Orchestration  
+
+When done well →  
+Accurate, scalable, trustworthy AI systems.
+
+---
+
+# Q&A
