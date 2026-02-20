@@ -1,5 +1,9 @@
 import path from 'path';
-import type { Movie } from '../types';
+import type {
+  RankedHybridResult,
+  RankedHybridResultWithCrossEncoder,
+  JudgedResult,
+} from '../types';
 import {
   AutoTokenizer,
   AutoModelForSequenceClassification,
@@ -34,25 +38,17 @@ class CrossEncoder {
   }
 
   async reRank(
-    results: [Movie, number, number, number, number, number][],
+    results: RankedHybridResult[],
     query: string,
-  ) {
+  ): Promise<RankedHybridResultWithCrossEncoder[]> {
     if (!this._model || !this._tokenizer) {
       throw new Error('Cross encoder not loaded');
     }
 
-    const reRankedResults: [
-      Movie,
-      number,
-      number,
-      number,
-      number,
-      number,
-      number,
-    ][] = [];
+    const reRankedResults: RankedHybridResultWithCrossEncoder[] = [];
 
     for (const result of results) {
-      const text = `${result[0].title} - ${result[0].description}`;
+      const text = `${result.movie.title} - ${result.movie.description}`;
 
       // Tokenize query and text as a pair
       const inputs = await this._tokenizer(query, {
@@ -67,10 +63,12 @@ class CrossEncoder {
       // Higher scores = more relevant
       const score = output.logits.data[0];
 
-      reRankedResults.push([...result, score]);
+      reRankedResults.push({ ...result, crossEncoderScore: score });
     }
 
-    return reRankedResults.sort((a, b) => b[6] - a[6]).slice(0, results.length);
+    return reRankedResults
+      .sort((a, b) => b.crossEncoderScore - a.crossEncoderScore)
+      .slice(0, results.length);
   }
 }
 
@@ -114,23 +112,23 @@ export class LLM {
   }
 
   async reRank(
-    results: [Movie, number, number, number, number, number][],
+    results: RankedHybridResult[],
     query: string,
-  ) {
+  ): Promise<RankedHybridResult[]> {
     const prompt = await Bun.file(
       path.resolve(LLM_PROMPT_PATH, 'rerank.md'),
     ).text();
     const movies = results
       .map(
-        ([result]) =>
-          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
+        ({ movie }) =>
+          `<movie id="${movie.id}" title="${movie.title}">${movie.description}</movie>`,
       )
       .join('\n');
     let embeddedPrompt = prompt.replace('{movies}', movies);
     embeddedPrompt = embeddedPrompt.replace('{query}', query);
     const response = await this.generateContent(embeddedPrompt);
     const reRankedResults = (JSON.parse(response) as number[])
-      .map((id) => results.find(([result]) => result.id === id)!)
+      .map((id) => results.find(({ movie }) => movie.id === id)!)
       .filter(Boolean);
 
     return reRankedResults;
@@ -138,9 +136,9 @@ export class LLM {
 
   async evaluate(
     results: (
-      | [Movie, number, number, number, number, number]
-      | [Movie, number, number, number, number, number, number]
-      | [Movie, number]
+      | RankedHybridResult
+      | RankedHybridResultWithCrossEncoder
+      | JudgedResult
     )[],
     query: string,
   ) {
@@ -149,8 +147,8 @@ export class LLM {
     ).text();
     const movies = results
       .map(
-        ([result]) =>
-          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
+        ({ movie }) =>
+          `<movie id="${movie.id}" title="${movie.title}">${movie.description}</movie>`,
       )
       .join('\n');
     const embeddedPrompt = prompt
@@ -162,10 +160,7 @@ export class LLM {
   }
 
   async augmentedGeneration(
-    results: (
-      | [Movie, number, number, number, number, number]
-      | [Movie, number, number, number, number, number, number]
-    )[],
+    results: (RankedHybridResult | RankedHybridResultWithCrossEncoder)[],
     query: string,
     type: (typeof RAG_TYPES)[keyof typeof RAG_TYPES],
   ) {
@@ -193,8 +188,8 @@ export class LLM {
     ).text();
     const movies = results
       .map(
-        ([result]) =>
-          `<movie id="${result.id}" title="${result.title}">${result.description}</movie>`,
+        ({ movie }) =>
+          `<movie id="${movie.id}" title="${movie.title}">${movie.description}</movie>`,
       )
       .join('\n');
     const embeddedPrompt = prompt
@@ -226,7 +221,9 @@ export class LLM {
     judge: boolean | undefined,
     k: number,
     topK: number,
-  ) {
+  ): Promise<
+    RankedHybridResult[] | RankedHybridResultWithCrossEncoder[] | JudgedResult[]
+  > {
     if (enhanced) {
       const enhancedQuery = await this.enhanced(query, enhanced);
       console.log(
@@ -241,11 +238,8 @@ export class LLM {
       k,
       reRank ? topK * 5 : topK,
     );
-    let results: (
-      | [Movie, number, number, number, number, number]
-      | [Movie, number, number, number, number, number, number]
-      | [Movie, number]
-    )[] = hybridResults;
+    let results: RankedHybridResult[] | RankedHybridResultWithCrossEncoder[] =
+      hybridResults;
 
     if (reRank) {
       const isLLM = reRank === RERANK_TYPES.LLM;
@@ -264,10 +258,10 @@ export class LLM {
 
     if (judge) {
       const evaluation = await this.evaluate(results, query);
-      const evaluationResults = (JSON.parse(evaluation) as number[]).map(
-        (score, index) => [results[index]![0], score],
-      ) as [Movie, number][];
-      results = evaluationResults;
+      const judgedResults = (JSON.parse(evaluation) as number[]).map(
+        (score, index) => ({ movie: results[index]!.movie, score }),
+      ) as JudgedResult[];
+      return judgedResults;
     }
 
     return results;

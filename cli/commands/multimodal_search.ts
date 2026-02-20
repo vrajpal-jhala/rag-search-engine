@@ -1,4 +1,4 @@
-import type { Movie } from '../types';
+import type { SemanticResult } from '../types';
 import path from 'path';
 import {
   CLIPTextModelWithProjection,
@@ -69,21 +69,26 @@ class MultimodalSearch {
     const { image_embeds } = await this.visionModel(imageInputs);
     const imageEmbedding = image_embeds.tolist()[0];
 
-    const similarities: [Movie, number][] = this.embeddings.map(
-      (embedding, index) => [
-        MOVIES[index]!,
-        cos_sim(embedding, imageEmbedding),
-      ],
+    const similarities: SemanticResult[] = this.embeddings.map(
+      (embedding, index) => ({
+        movie: MOVIES[index]!,
+        score: cos_sim(embedding, imageEmbedding),
+      }),
     );
-    const sortedSimilarities = similarities.sort((a, b) => b[1] - a[1]);
-    return sortedSimilarities.slice(0, topK);
+    return similarities.sort((a, b) => b.score - a.score).slice(0, topK);
   }
 }
 
-export const multimodalSearch = async (image: string, limit: number = 5) => {
+export const multimodalSearch = async (
+  image: string,
+  limit: number = 5,
+): Promise<SemanticResult[]> => {
   const multimodalSearch = new MultimodalSearch();
   await multimodalSearch.load();
   return (await multimodalSearch.search(image, limit)).map(
-    ([result, score]) => [result, parseFloat(score.toFixed(3))],
-  ) as [Movie, number][];
+    ({ movie, score }) => ({
+      movie,
+      score: parseFloat(score.toFixed(3)),
+    }),
+  );
 };

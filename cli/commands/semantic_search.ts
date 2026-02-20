@@ -1,4 +1,4 @@
-import type { Movie } from '../types';
+import type { Movie, SemanticResult } from '../types';
 import path from 'path';
 import {
   BASIC_VECTOR_CACHE_PATH,
@@ -78,17 +78,17 @@ class VectorIndex {
 
   async search(query: string, topK: number) {
     const queryEmbedding = await embed(VectorIndex.model, [query]);
-    const similarities: [Movie, number][] = [];
+    const similarities: SemanticResult[] = [];
 
     for (let i = 0; i < this.embeddings.length; i++) {
       const embedding = this.embeddings[i]!;
       const cos = this._cosineSimilarity(embedding, queryEmbedding[0]!);
 
       // since we don't map embeddings to documents IDs, we need to use the index to get the movie
-      similarities.push([MOVIES[i]!, cos]);
+      similarities.push({ movie: MOVIES[i]!, score: cos });
     }
 
-    return similarities.sort((a, b) => b[1] - a[1]).slice(0, topK);
+    return similarities.sort((a, b) => b.score - a.score).slice(0, topK);
   }
 
   async save() {
@@ -228,7 +228,11 @@ export class ChunkedVectorIndex extends VectorIndex {
 
   override async search(query: string, topK: number) {
     const queryEmbedding = await embed(VectorIndex.model, [query]);
-    const chunkSimilarities: [Movie['id'], number, number][] = [];
+    const chunkSimilarities: {
+      id: Movie['id'];
+      chunkIndex: number;
+      score: number;
+    }[] = [];
     const similarities: Record<Movie['id'], number> = {};
 
     for (let i = 0; i < this.embeddings.length; i++) {
@@ -236,7 +240,11 @@ export class ChunkedVectorIndex extends VectorIndex {
       const metadata = this.chunkMetadata[i]!;
       const cos = this._cosineSimilarity(embedding, queryEmbedding[0]!);
 
-      chunkSimilarities.push([metadata.id, metadata.chunkIndex, cos]);
+      chunkSimilarities.push({
+        id: metadata.id,
+        chunkIndex: metadata.chunkIndex,
+        score: cos,
+      });
       similarities[metadata.id] = Math.max(similarities[metadata.id] || 0, cos);
     }
 
@@ -244,10 +252,12 @@ export class ChunkedVectorIndex extends VectorIndex {
       .sort((a, b) => b[1] - a[1])
       .slice(0, topK);
 
-    return sortedSimilarities.map(([id, score]): [Movie, number] => [
-      this.docMap[parseInt(id)]!,
-      score,
-    ]);
+    return sortedSimilarities.map(
+      ([id, score]): SemanticResult => ({
+        movie: this.docMap[parseInt(id)]!,
+        score,
+      }),
+    );
   }
 
   override async save() {
@@ -278,30 +288,26 @@ export const buildChunkedVectorIndex = async () => {
   await vectorIndex.save();
 };
 
-export const semanticSearch = async (query: string, topK: number = 5) => {
+export const semanticSearch = async (
+  query: string,
+  topK: number = 5,
+): Promise<SemanticResult[]> => {
   const vectorIndex = new VectorIndex();
   await vectorIndex.load();
-  const results: [Movie, number][] = (
-    await vectorIndex.search(query, topK)
-  ).map(([movie, score]) => [
-    vectorIndex.docMap[movie.id]!,
-    parseFloat(score.toFixed(4)),
-  ]);
-
-  return results;
+  return (await vectorIndex.search(query, topK)).map(({ movie, score }) => ({
+    movie: vectorIndex.docMap[movie.id]!,
+    score: parseFloat(score.toFixed(4)),
+  }));
 };
 
 export const chunkedSemanticSearch = async (
   query: string,
   topK: number = 5,
-) => {
+): Promise<SemanticResult[]> => {
   const vectorIndex = new ChunkedVectorIndex();
   await vectorIndex.load();
-  let results: [Movie, number][] = await vectorIndex.search(query, topK);
-  results = results.map(([movie, score]) => [
-    vectorIndex.docMap[movie.id]!,
-    parseFloat(score.toFixed(4)),
-  ]);
-
-  return results;
+  return (await vectorIndex.search(query, topK)).map(({ movie, score }) => ({
+    movie: vectorIndex.docMap[movie.id]!,
+    score: parseFloat(score.toFixed(4)),
+  }));
 };

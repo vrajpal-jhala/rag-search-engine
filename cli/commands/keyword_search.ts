@@ -1,4 +1,4 @@
-import type { Movie } from '../types';
+import type { Movie, KeywordResult } from '../types';
 import path from 'path';
 import { partialMatch, sanitizeText, tokenizeText } from '../utils';
 import { BM25_B, BM25_K1, KEYWORD_CACHE_PATH, MOVIES } from '../constants';
@@ -225,7 +225,7 @@ export class InvertedIndex {
   }
 
   async search(query: string, topK: number) {
-    const results: [Movie, number][] = [];
+    const results: KeywordResult[] = [];
     const scores: Record<Movie['id'], number> = {};
     const sanitizedQueryTokens = tokenizeText(sanitizeText(query));
 
@@ -252,10 +252,10 @@ export class InvertedIndex {
       .slice(0, topK);
 
     for (const [docId, score] of sortedScores) {
-      results.push([
-        this.docMap[parseInt(docId)]!,
-        parseFloat(score.toFixed(2)),
-      ]);
+      results.push({
+        movie: this.docMap[parseInt(docId)]!,
+        score: parseFloat(score.toFixed(2)),
+      });
     }
 
     return results;
@@ -366,8 +366,11 @@ export const basicSearch = async (
   return invertedIndex._search(query, topK);
 };
 
-export const tfIdfSearch = async (query: string, topK: number = 5) => {
-  const results: [Movie, number][] = [];
+export const tfIdfSearch = async (
+  query: string,
+  topK: number = 5,
+): Promise<KeywordResult[]> => {
+  const results: KeywordResult[] = [];
   const scores: Record<Movie['id'], number> = {};
   const sanitizedQueryTokens = tokenizeText(sanitizeText(query));
   const invertedIndex = new InvertedIndex();
@@ -397,10 +400,10 @@ export const tfIdfSearch = async (query: string, topK: number = 5) => {
     .slice(0, topK);
 
   for (const [docId, score] of sortedScores) {
-    results.push([
-      invertedIndex.docMap[parseInt(docId)]!,
-      parseFloat(score.toFixed(2)),
-    ]);
+    results.push({
+      movie: invertedIndex.docMap[parseInt(docId)]!,
+      score: parseFloat(score.toFixed(2)),
+    });
   }
 
   return results;

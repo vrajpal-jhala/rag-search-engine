@@ -1,3 +1,8 @@
+import type {
+  RankedHybridResult,
+  RankedHybridResultWithCrossEncoder,
+  JudgedResult,
+} from './types';
 import { Command, Option } from 'commander';
 import pkg from '../package.json';
 import {
@@ -66,9 +71,9 @@ program
           type === KEYWORD_SEARCH_TYPES.TF_IDF ? tfIdfSearch : bm25Search;
         const searchResults = await search(query, limit);
 
-        searchResults.forEach(([result, score], index) => {
+        searchResults.forEach(({ movie, score }, index) => {
           console.log(
-            `${index + 1}. (${result.id}) ${result.title} - Score: ${score}`,
+            `${index + 1}. (${movie.id}) ${movie.title} - Score: ${score}`,
           );
         });
 
@@ -90,10 +95,10 @@ program
     const search = chunked ? chunkedSemanticSearch : semanticSearch;
     const results = await search(query, limit);
 
-    results.forEach(([result, score], index) => {
+    results.forEach(({ movie, score }, index) => {
       console.log(
-        `${index + 1}. ${result.title} - Score: ${score}
-        ${result.description.slice(0, 100)}...`,
+        `${index + 1}. ${movie.title} - Score: ${score}
+        ${movie.description.slice(0, 100)}...`,
       );
     });
   });
@@ -118,29 +123,28 @@ program
       const results = await rankedHybridSearch(query, k, limit);
 
       results.forEach(
-        (
-          [result, rank, _score, semanticRank, _semanticScore, hybridScore],
-          index,
-        ) => {
+        ({ movie, bm25Rank, semanticRank, hybridScore }, index) => {
           console.log(
-            `${index + 1}. ${result.title}
+            `${index + 1}. ${movie.title}
               RRF Score: ${hybridScore}
-              BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
-              ${result.description.slice(0, 100)}...`,
+              BM25 Rank: ${bm25Rank}, Semantic Rank: ${semanticRank}
+              ${movie.description.slice(0, 100)}...`,
           );
         },
       );
     } else {
       const results = await hybridSearch(query, alpha, limit);
 
-      results.forEach(([result, score, semanticScore, hybridScore], index) => {
-        console.log(
-          `${index + 1}. ${result.title}
+      results.forEach(
+        ({ movie, bm25Score, semanticScore, hybridScore }, index) => {
+          console.log(
+            `${index + 1}. ${movie.title}
           Hybrid Score: ${hybridScore}
-          BM25 Score: ${score}, Semantic Score: ${semanticScore}
-          ${result.description.slice(0, 100)}...`,
-        );
-      });
+          BM25 Score: ${bm25Score}, Semantic Score: ${semanticScore}
+          ${movie.description.slice(0, 100)}...`,
+          );
+        },
+      );
     }
   });
 
@@ -174,28 +178,28 @@ program
     );
 
     if (judge) {
-      results.forEach(([result, score], index) => {
-        console.log(`${index + 1}. ${result.title}: ${score}/3`);
+      (results as JudgedResult[]).forEach(({ movie, score }, index) => {
+        console.log(`${index + 1}. ${movie.title}: ${score}/3`);
       });
     } else {
-      results.forEach(
-        (
-          [result, rank, , semanticRank, , hybridScore, crossEncoderScore],
-          index,
-        ) => {
-          console.log(
-            `${index + 1}. ${result.title}${
-              reRank === RERANK_TYPES.CROSS_ENCODER
-                ? `
+      (
+        results as (RankedHybridResult | RankedHybridResultWithCrossEncoder)[]
+      ).forEach((result, index) => {
+        const { movie, bm25Rank, semanticRank, hybridScore } = result;
+        const crossEncoderScore =
+          'crossEncoderScore' in result ? result.crossEncoderScore : undefined;
+        console.log(
+          `${index + 1}. ${movie.title}${
+            reRank === RERANK_TYPES.CROSS_ENCODER
+              ? `
             Cross Encoder Score: ${crossEncoderScore}`
-                : ''
-            }
+              : ''
+          }
           RRF Score: ${hybridScore}
-          BM25 Rank: ${rank}, Semantic Rank: ${semanticRank}
-          ${result.description.slice(0, 100)}...`,
-          );
-        },
-      );
+          BM25 Rank: ${bm25Rank}, Semantic Rank: ${semanticRank}
+          ${movie.description.slice(0, 100)}...`,
+        );
+      });
     }
   });
 
@@ -230,9 +234,9 @@ program
     const { limit } = options;
     const results = await multimodalSearch(image, limit);
 
-    results.forEach(([result, score], index) => {
-      console.log(`${index + 1}. ${result.title} - Score: ${score}`);
-      console.log(`${result.description.slice(0, 100)}...`);
+    results.forEach(({ movie, score }, index) => {
+      console.log(`${index + 1}. ${movie.title} - Score: ${score}`);
+      console.log(`${movie.description.slice(0, 100)}...`);
     });
   });
 

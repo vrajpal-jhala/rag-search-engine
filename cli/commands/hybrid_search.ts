@@ -1,4 +1,4 @@
-import type { Movie } from '../types';
+import type { Movie, HybridResult, RankedHybridResult } from '../types';
 import { InvertedIndex } from './keyword_search';
 import { ChunkedVectorIndex } from './semantic_search';
 import { HYBRID_SEARCH_ALPHA, RECIPROCAL_RANK_FUSION_K } from '../constants';
@@ -24,16 +24,16 @@ export class HybridSearch {
   }
 
   private _normalizeSearchResults(
-    results: [Movie, number][],
-  ): [Movie, number, number][] {
-    const scores = results.map(([, score]) => score);
+    results: { movie: Movie; score: number }[],
+  ): { movie: Movie; score: number; normalizedScore: number }[] {
+    const scores = results.map(({ score }) => score);
     const normalizedScores = this._normalizeScores(scores);
 
-    return results.map(([result, score], index) => [
-      result,
+    return results.map(({ movie, score }, index) => ({
+      movie,
       score,
-      normalizedScores[index]!,
-    ]);
+      normalizedScore: normalizedScores[index]!,
+    }));
   }
 
   private _hybridScore(
@@ -50,32 +50,39 @@ export class HybridSearch {
     const normalizedResults = this._normalizeSearchResults(results);
     const normalizedSemanticResults =
       this._normalizeSearchResults(semanticResults);
-    const combinedResults: Record<Movie['id'], [Movie, number, number]> = {};
+    const combinedResults: Record<
+      Movie['id'],
+      { movie: Movie; bm25Score: number; semanticScore: number }
+    > = {};
 
-    normalizedResults.forEach(([result, _score, normalizedScore]) => {
-      combinedResults[result.id] = [result, normalizedScore, 0];
+    normalizedResults.forEach(({ movie, normalizedScore }) => {
+      combinedResults[movie.id] = {
+        movie,
+        bm25Score: normalizedScore,
+        semanticScore: 0,
+      };
     });
 
-    normalizedSemanticResults.forEach(([result, _score, normalizedScore]) => {
-      if (!combinedResults[result.id]) {
-        combinedResults[result.id] = [result, 0, 0];
+    normalizedSemanticResults.forEach(({ movie, normalizedScore }) => {
+      if (!combinedResults[movie.id]) {
+        combinedResults[movie.id] = { movie, bm25Score: 0, semanticScore: 0 };
       }
 
-      combinedResults[result.id]![2] = normalizedScore;
+      combinedResults[movie.id]!.semanticScore = normalizedScore;
     });
 
-    const hybridResults: [Movie, number, number, number][] = Object.values(
-      combinedResults,
-    ).map(([result, score, semanticScore]) => {
-      return [
-        result,
-        score,
+    const hybridResults: HybridResult[] = Object.values(combinedResults).map(
+      ({ movie, bm25Score, semanticScore }) => ({
+        movie,
+        bm25Score,
         semanticScore,
-        this._hybridScore(score, semanticScore, alpha),
-      ];
-    });
+        hybridScore: this._hybridScore(bm25Score, semanticScore, alpha),
+      }),
+    );
 
-    return hybridResults.sort((a, b) => b[3] - a[3]).slice(0, topK);
+    return hybridResults
+      .sort((a, b) => b.hybridScore - a.hybridScore)
+      .slice(0, topK);
   }
 
   private _rrfScore(rank: number, k: number) {
@@ -87,45 +94,57 @@ export class HybridSearch {
     const semanticResults = await this.vectorIndex.search(query, topK * 500);
     const combinedResults: Record<
       Movie['id'],
-      [Movie, number, number, number, number]
+      {
+        movie: Movie;
+        bm25Rank: number;
+        bm25Score: number;
+        semanticRank: number;
+        semanticScore: number;
+      }
     > = {};
 
-    results.forEach(([result], rank) => {
-      combinedResults[result.id] = [
-        result,
-        rank + 1,
-        this._rrfScore(rank + 1, k),
-        0,
-        0,
-      ];
+    results.forEach(({ movie }, rank) => {
+      combinedResults[movie.id] = {
+        movie,
+        bm25Rank: rank + 1,
+        bm25Score: this._rrfScore(rank + 1, k),
+        semanticRank: 0,
+        semanticScore: 0,
+      };
     });
 
-    semanticResults.forEach(([result], rank) => {
-      if (!combinedResults[result.id]) {
-        combinedResults[result.id] = [result, 0, 0, 0, 0];
+    semanticResults.forEach(({ movie }, rank) => {
+      if (!combinedResults[movie.id]) {
+        combinedResults[movie.id] = {
+          movie,
+          bm25Rank: 0,
+          bm25Score: 0,
+          semanticRank: 0,
+          semanticScore: 0,
+        };
       }
 
-      combinedResults[result.id]![3] = rank + 1;
-      combinedResults[result.id]![4] = this._rrfScore(rank + 1, k);
+      combinedResults[movie.id]!.semanticRank = rank + 1;
+      combinedResults[movie.id]!.semanticScore = this._rrfScore(rank + 1, k);
     });
 
-    const hybridResults: [Movie, number, number, number, number, number][] =
-      Object.values(combinedResults).map(
-        ([result, rank, score, semanticRank, semanticScore]) => {
-          return [
-            result,
-            rank,
-            score,
-            semanticRank,
-            semanticScore,
-            rank && semanticRank
-              ? this._rrfScore(rank, k) + this._rrfScore(semanticRank, k)
-              : 0,
-          ];
-        },
-      );
+    const hybridResults: RankedHybridResult[] = Object.values(
+      combinedResults,
+    ).map(({ movie, bm25Rank, bm25Score, semanticRank, semanticScore }) => ({
+      movie,
+      bm25Rank,
+      bm25Score,
+      semanticRank,
+      semanticScore,
+      hybridScore:
+        bm25Rank && semanticRank
+          ? this._rrfScore(bm25Rank, k) + this._rrfScore(semanticRank, k)
+          : 0,
+    }));
 
-    return hybridResults.sort((a, b) => b[5] - a[5]).slice(0, topK);
+    return hybridResults
+      .sort((a, b) => b.hybridScore - a.hybridScore)
+      .slice(0, topK);
   }
 
   async load() {
