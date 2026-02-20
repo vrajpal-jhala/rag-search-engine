@@ -134,3 +134,7 @@
   - Multi-modal RAG
     - Text, images, videos, audio, etc.
     - With multi-modal LLM
+    - Comparable
+      - Convert image to text using LLM to make them comparable
+      - Use image alt text (to minimize the distance between the image and the text embeddings)
+      - Text surrounded by image

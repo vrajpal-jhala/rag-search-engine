@@ -48,3 +48,4 @@ export const RAG_TYPES = {
   CITATION: 'citation',
   DETAILED_ANSWER: 'detailed_answer',
 } as const;
+export const MULTIMODAL_EMBEDDING_MODEL = 'Xenova/clip-vit-base-patch32';

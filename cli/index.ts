@@ -22,6 +22,7 @@ import { hybridSearch, rankedHybridSearch } from './commands/hybrid_search';
 import { llmAidedHybridSearch } from './commands/llm_search';
 import { rag } from './commands/rag';
 import { evaluate } from './commands/evaluation';
+import { multimodalSearch } from './commands/multimodal_search';
 import {
   HYBRID_SEARCH_TYPES,
   INDEX_TYPES,
@@ -213,11 +214,26 @@ program
     const { type, image, limit } = options;
     const [results, answer] = await rag(query, type, image, limit);
 
-    console.log('Search Results:')
+    console.log('Search Results:');
     results.forEach((result) => {
       console.log(`- ${result.title}`);
     });
     console.log(`Answer: ${answer}`);
+  });
+
+program
+  .command('multimodal-search')
+  .description('Multimodal search')
+  .argument('<image>', 'Image path')
+  .option('-l, --limit <number>', 'Number of results', Number, 5)
+  .action(async (image, options) => {
+    const { limit } = options;
+    const results = await multimodalSearch(image, limit);
+
+    results.forEach(([result, score], index) => {
+      console.log(`${index + 1}. ${result.title} - Score: ${score}`);
+      console.log(`${result.description.slice(0, 100)}...`);
+    });
   });
 
 program
